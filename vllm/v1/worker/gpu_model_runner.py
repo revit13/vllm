@@ -2300,7 +2300,13 @@ class GPUModelRunner(
         )
 
         if not mm_kwargs:
+            logger.debug("_execute_mm_encoder: no mm inputs to encode, skipping")
             return []
+
+        logger.debug(
+            "_execute_mm_encoder: encoding %d multimodal item(s) for batch",
+            len(mm_kwargs),
+        )
 
         should_time = bool(
             self.observability_config
@@ -2381,6 +2387,10 @@ class GPUModelRunner(
             device=self.device,
             pin_memory=self.pin_memory,
         ):
+            logger.debug(
+                "_execute_mm_encoder: running encoder for modality=%s, num_items=%d",
+                modality, num_items,
+            )
             curr_group_outputs: MultiModalEmbeddings
 
             # EVS-related change.
@@ -2443,8 +2453,19 @@ class GPUModelRunner(
         # Cache the encoder outputs by mm_hash
         for mm_hash, output in zip(mm_hashes, encoder_outputs):
             self.encoder_cache[mm_hash] = output
-            logger.debug("Finish execute for mm hash %s", mm_hash)
+            logger.debug(
+                "Encoding done: mm_hash=%s shape=%s dtype=%s device=%s",
+                mm_hash,
+                tuple(output.shape),
+                output.dtype,
+                output.device,
+            )
             self.maybe_save_ec_to_connector(self.encoder_cache, mm_hash)
+
+        logger.debug(
+            "_execute_mm_encoder: done, %d outputs cached, encoder_cache size=%d",
+            len(encoder_outputs), len(self.encoder_cache),
+        )
 
         return encoder_outputs
 
