@@ -2510,6 +2510,11 @@ class GPUModelRunner(
 
                 mm_hash = mm_feature.identifier
                 encoder_output = self.encoder_cache.get(mm_hash, None)
+                logger.debug(
+                    "Gather mm embeddings: cache %s for mm_hash=%s",
+                    "HIT" if encoder_output is not None else "MISS",
+                    mm_hash,
+                )
                 assert encoder_output is not None, f"Encoder cache miss for {mm_hash}."
 
                 if (is_embed := pos_info.is_embed) is not None:
