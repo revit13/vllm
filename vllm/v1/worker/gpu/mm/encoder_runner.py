@@ -3,10 +3,13 @@
 import numpy as np
 import torch
 
+from vllm.logger import init_logger
 from vllm.model_executor.models.interfaces import SupportsMultiModal
 from vllm.multimodal.inputs import MultiModalFeatureSpec, MultiModalKwargsItem
 from vllm.multimodal.utils import group_mm_kwargs_by_modality
 from vllm.v1.worker.utils import sanity_check_mm_encoder_outputs
+
+logger = init_logger(__name__)
 
 
 class EncoderRunner:
@@ -56,6 +59,19 @@ class EncoderRunner:
     def prepare_mm_inputs(
         self, scheduled_encoder_inputs: dict[str, list[int]]
     ) -> tuple[list[str], list[tuple[str, MultiModalKwargsItem]]]:
+        if not scheduled_encoder_inputs:
+            logger.debug(
+                "prepare_mm_inputs: scheduled_encoder_inputs is empty "
+                "(no encoder inputs scheduled this step)"
+            )
+            return [], []
+
+        logger.debug(
+            "prepare_mm_inputs: scheduled_encoder_inputs has %d request(s): %s",
+            len(scheduled_encoder_inputs),
+            {req_id: list(ids) for req_id, ids in scheduled_encoder_inputs.items()},
+        )
+
         mm_hashes: list[str] = []
         mm_kwargs: list[tuple[str, MultiModalKwargsItem]] = []
         for req_id, encoder_input_ids in scheduled_encoder_inputs.items():
@@ -63,6 +79,12 @@ class EncoderRunner:
             for mm_input_id in encoder_input_ids:
                 mm_feature = mm_features[mm_input_id]
                 if mm_feature.data is None:
+                    logger.debug(
+                        "prepare_mm_inputs: mm_feature.data is None for "
+                        "req_id=%s input_id=%d mm_hash=%s "
+                        "(data not available on this node)",
+                        req_id, mm_input_id, mm_feature.identifier,
+                    )
                     continue
                 mm_hashes.append(mm_feature.identifier)
                 mm_kwargs.append((mm_feature.modality, mm_feature.data))
@@ -77,20 +99,49 @@ class EncoderRunner:
         mm_kwargs: list[tuple[str, MultiModalKwargsItem]],
     ) -> list[torch.Tensor]:
         if not mm_hashes:
+            logger.debug("execute_mm_encoder: no mm inputs to encode, skipping")
             return []
+
+        logger.debug(
+            "execute_mm_encoder: encoding %d multimodal item(s)", len(mm_hashes)
+        )
 
         encoder_outputs: list[torch.Tensor] = []
         for modality, num_items, mm_kwargs_group in group_mm_kwargs_by_modality(
             mm_kwargs, device=self.device, pin_memory=False
         ):
+            logger.debug(
+                "execute_mm_encoder: running encoder for modality=%s, num_items=%d",
+                modality, num_items,
+            )
             curr_group_outputs = model.embed_multimodal(**mm_kwargs_group)
             sanity_check_mm_encoder_outputs(
                 curr_group_outputs, expected_num_items=num_items
             )
             encoder_outputs.extend(curr_group_outputs)
 
-        # Cache the encoder outputs by mm_hash
-        self.encoder_cache.update(zip(mm_hashes, encoder_outputs))
+        # Cache the encoder outputs by mm_hash and log embedding info
+        for mm_hash, output in zip(mm_hashes, encoder_outputs):
+            self.encoder_cache[mm_hash] = output
+            _out_cpu = output.float().cpu()
+            logger.debug(
+                "Encoding done: mm_hash=%s shape=%s dtype=%s device=%s "
+                "min=%.4f max=%.4f mean=%.4f std=%.4f first_values=%s",
+                mm_hash,
+                tuple(output.shape),
+                output.dtype,
+                output.device,
+                float(_out_cpu.min()),
+                float(_out_cpu.max()),
+                float(_out_cpu.mean()),
+                float(_out_cpu.std()),
+                _out_cpu.flatten()[:8].tolist(),
+            )
+
+        logger.debug(
+            "execute_mm_encoder: done, %d outputs cached, encoder_cache size=%d",
+            len(encoder_outputs), len(self.encoder_cache),
+        )
         return encoder_outputs
 
     def gather_mm_embeddings(
@@ -149,6 +200,11 @@ class EncoderRunner:
 
                 mm_hash = mm_feature.identifier
                 encoder_output = self.encoder_cache.get(mm_hash, None)
+                logger.debug(
+                    "gather_mm_embeddings: cache %s for mm_hash=%s (req_id=%s)",
+                    "HIT" if encoder_output is not None else "MISS",
+                    mm_hash, req_id,
+                )
                 assert encoder_output is not None, f"Encoder cache miss for {mm_hash}."
 
                 if (is_embed := pos_info.is_embed) is not None:
