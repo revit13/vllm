@@ -2271,7 +2271,17 @@ class GPUModelRunner(
         """
         scheduled_encoder_inputs = scheduler_output.scheduled_encoder_inputs
         if not scheduled_encoder_inputs:
+            logger.debug(
+                "_batch_mm_inputs: scheduled_encoder_inputs is empty "
+                "(no encoder inputs scheduled this step)"
+            )
             return [], [], []
+
+        logger.debug(
+            "_batch_mm_inputs: scheduled_encoder_inputs has %d request(s): %s",
+            len(scheduled_encoder_inputs),
+            {req_id: list(ids) for req_id, ids in scheduled_encoder_inputs.items()},
+        )
 
         mm_hashes = list[str]()
         mm_kwargs = list[tuple[str, MultiModalKwargsItem]]()
@@ -2284,6 +2294,12 @@ class GPUModelRunner(
             for mm_input_id in encoder_input_ids:
                 mm_feature = req_state.mm_features[mm_input_id]
                 if mm_feature.data is None:
+                    logger.debug(
+                        "_batch_mm_inputs: mm_feature.data is None for "
+                        "req_id=%s input_id=%d mm_hash=%s "
+                        "(data already consumed or not available on this node)",
+                        req_id, mm_input_id, mm_feature.identifier,
+                    )
                     continue
 
                 mm_hashes.append(mm_feature.identifier)
@@ -2300,7 +2316,11 @@ class GPUModelRunner(
         )
 
         if not mm_kwargs:
-            logger.debug("_execute_mm_encoder: no mm inputs to encode, skipping")
+            logger.debug(
+                "_execute_mm_encoder: no mm inputs to encode after batching "
+                "(scheduled_encoder_inputs=%d req(s) but all data was None)",
+                len(scheduler_output.scheduled_encoder_inputs),
+            )
             return []
 
         logger.debug(
