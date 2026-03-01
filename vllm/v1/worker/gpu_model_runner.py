@@ -2453,12 +2453,21 @@ class GPUModelRunner(
         # Cache the encoder outputs by mm_hash
         for mm_hash, output in zip(mm_hashes, encoder_outputs):
             self.encoder_cache[mm_hash] = output
+            # Print embedding summary: shape, stats, and first few values
+            _out_cpu = output.float().cpu()
             logger.debug(
-                "Encoding done: mm_hash=%s shape=%s dtype=%s device=%s",
+                "Encoding done: mm_hash=%s shape=%s dtype=%s device=%s "
+                "min=%.4f max=%.4f mean=%.4f std=%.4f "
+                "first_values=%s",
                 mm_hash,
                 tuple(output.shape),
                 output.dtype,
                 output.device,
+                float(_out_cpu.min()),
+                float(_out_cpu.max()),
+                float(_out_cpu.mean()),
+                float(_out_cpu.std()),
+                _out_cpu.flatten()[:8].tolist(),
             )
             self.maybe_save_ec_to_connector(self.encoder_cache, mm_hash)
 
