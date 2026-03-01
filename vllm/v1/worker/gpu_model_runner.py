@@ -896,7 +896,9 @@ class GPUModelRunner(
 
         # Free the cached encoder outputs.
         for mm_hash in scheduler_output.free_encoder_mm_hashes:
-            self.encoder_cache.pop(mm_hash, None)
+            evicted = self.encoder_cache.pop(mm_hash, None)
+            if evicted is not None:
+                logger.debug("Encoder cache FREE for mm_hash=%s", mm_hash)
 
         # Remove the unscheduled requests from the persistent batch.
         # NOTE(woosuk): The unscheduled requests are either preempted requests
@@ -2506,6 +2508,11 @@ class GPUModelRunner(
 
                 mm_hash = mm_feature.identifier
                 encoder_output = self.encoder_cache.get(mm_hash, None)
+                logger.debug(
+                    "Gather mm embeddings: cache %s for mm_hash=%s (req_id=%s)",
+                    "HIT" if encoder_output is not None else "MISS",
+                    mm_hash, req_id,
+                )
                 assert encoder_output is not None, f"Encoder cache miss for {mm_hash}."
 
                 if (is_embed := pos_info.is_embed) is not None:
