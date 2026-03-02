@@ -2489,6 +2489,11 @@ class GPUModelRunner(
                 float(_out_cpu.std()),
                 _out_cpu.flatten()[:8].tolist(),
             )
+            logger.info(
+                "[EC-PRODUCER] Storing encoder output to EC connector: "
+                "mm_hash=%s shape=%s dtype=%s",
+                mm_hash, tuple(output.shape), output.dtype,
+            )
             self.maybe_save_ec_to_connector(self.encoder_cache, mm_hash)
 
         logger.debug(

@@ -1,0 +1,199 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  annotations:
+    meta.helm.sh/release-name: ms-e-dp-disaggregation
+    meta.helm.sh/release-namespace: epd
+  name: ms-e-dp-disaggregation-llm-d-modelservice-encode
+  namespace: epd
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: v0.4.0
+    helm.sh/chart: llm-d-modelservice-v0.4.8
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/accelerator-variant: gpu
+      llm-d.ai/accelerator-vendor: nvidia
+      llm-d.ai/guide: e-dp-disaggregation
+      llm-d.ai/inference-serving: 'true'
+      llm-d.ai/model: Qwen3Qwen3-VL-2B-Instruct
+      llm-d.ai/role: encode
+  template:
+    metadata:
+      labels:
+        llm-d.ai/accelerator-variant: gpu
+        llm-d.ai/accelerator-vendor: nvidia
+        llm-d.ai/guide: e-dp-disaggregation
+        llm-d.ai/inference-serving: 'true'
+        llm-d.ai/model: Qwen3Qwen3-VL-2B-Instruct
+        llm-d.ai/role: encode
+    spec:
+      restartPolicy: Always
+      initContainers:
+        - name: fix-permissions
+          image: 'busybox:latest'
+          command:
+            - sh
+            - '-c'
+            - chmod -R 777 /shared-ec-cache
+          securityContext:
+            runAsUser: 0
+            privileged: true
+          volumeMounts:
+            - name: ec-cache
+              mountPath: /shared-ec-cache
+      serviceAccountName: ms-e-dp-disaggregation-llm-d-modelservice
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seLinuxOptions:
+          type: spc_t
+      containers:
+        - resources:
+            limits:
+              cpu: '32'
+              memory: 100Gi
+              nvidia.com/gpu: '2'
+            requests:
+              cpu: '32'
+              memory: 100Gi
+              nvidia.com/gpu: '2'
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: vllm
+              scheme: HTTP
+            timeoutSeconds: 2
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          name: vllm
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: vllm
+              scheme: HTTP
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          env:
+            - name: PORT
+              value: '8000'
+            - name: VLLM_USE_V1
+              value: '0'
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /data
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: llm-d-hf-token
+                  key: HF_TOKEN
+            - name: TRITON_CACHE_DIR
+              value: /.triton-cache
+            - name: DP_SIZE
+              value: '1'
+            #- name: TP_SIZE
+            #  value: '2'
+            - name: DP_SIZE_LOCAL
+              value: '1'
+            - name: HF_HOME
+              value: /model-cache
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: vllm
+              containerPort: 8000
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          startupProbe:
+            httpGet:
+              path: /v1/models
+              port: vllm
+              scheme: HTTP
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 60
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /data
+            - name: ec-cache
+              mountPath: /shared-ec-cache
+            - name: metrics-volume
+              mountPath: /.config
+            - name: shm
+              mountPath: /dev/shm
+            - name: torch-compile-cache
+              mountPath: /.cache
+            - name: triton-cache
+              mountPath: /.triton-cache
+            - name: model-storage
+              mountPath: /model-cache
+            - name: shared-image-storage
+              mountPath: /data/images
+          terminationMessagePolicy: File
+          image: 'ghcr.io/revit13/vllm-openai:v0.16.0-debug'
+          args:
+            - '--model'
+            - Qwen/Qwen3-VL-2B-Instruct
+            - '--port'
+            - '8000'
+            - '--tensor-parallel-size'
+            - '2'
+            - '--disable-access-log-for-endpoints'
+            - '/health,/metrics,/v1/models'
+            - '--enforce-eager'
+            - '--mm-encoder-only'
+            - '--no-enable-prefix-caching'
+            - '--allowed-local-media-path'
+            - /data/images
+            - '--ec-transfer-config'
+            - '{"ec_connector": "ECExampleConnector", "ec_role": "ec_producer", "ec_connector_extra_config": {"shared_storage_path": "/shared-ec-cache"}}'
+      serviceAccount: ms-e-dp-disaggregation-llm-d-modelservice
+      volumes:
+        - name: hf-cache
+          emptyDir:
+            sizeLimit: 100Gi
+        - name: ec-cache
+          persistentVolumeClaim:
+            claimName: ec-cache-pvc
+        - name: metrics-volume
+          emptyDir: {}
+        - name: torch-compile-cache
+          emptyDir: {}
+        - name: triton-cache
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 20Gi
+        - name: model-storage
+          emptyDir:
+            sizeLimit: 80Gi
+        - name: shared-image-storage
+          persistentVolumeClaim:
+            claimName: shared-image-storage-pvc
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+
+# Made with Bob

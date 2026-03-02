@@ -54,6 +54,41 @@ decode_session: aiohttp.ClientSession | None = None
 MM_TYPES = {"image_url", "audio_url", "input_audio"}
 
 
+def strip_local_file_urls(request_data: dict) -> dict:
+    """
+    Replace file:// URLs with null in image_url items before forwarding
+    to prefill/decode pods that don't have --allowed-local-media-path.
+
+    The encoder pod already processed the image and saved it to the EC cache
+    (identified by uuid), so the decode pod only needs the uuid — not the URL.
+
+    Example transformation:
+        {"type": "image_url", "image_url": {"url": "file:///data/images/x.jpg"}, "uuid": "x"}
+        → {"type": "image_url", "image_url": null, "uuid": "x"}
+    """
+    import copy
+    import json
+
+    data = copy.deepcopy(request_data)
+    for msg in data.get("messages", []):
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            if item.get("type") == "image_url":
+                img = item.get("image_url")
+                if isinstance(img, dict):
+                    url = img.get("url", "")
+                    if isinstance(url, str) and url.startswith("file://"):
+                        logger.debug(
+                            "strip_local_file_urls: replacing file:// URL '%s' with null "
+                            "(uuid=%s)",
+                            url, item.get("uuid", "<none>"),
+                        )
+                        item["image_url"] = None
+    return data
+
+
 def extract_mm_items(request_data: dict) -> list[dict]:
     """
     Return *all* image/audio items that appear anywhere in `messages`.
@@ -322,6 +357,10 @@ async def forward_non_stream(
         # Step 1: Process through Encoder instance (if has MM input)
         await fanout_encoder_primer(req_data, e_urls, req_id)
 
+        # Step 1b: Strip file:// URLs — encoder already cached them by uuid;
+        # prefill/decode pods don't have --allowed-local-media-path
+        req_data = strip_local_file_urls(req_data)
+
         # Step 2: Process through Prefill instance
         req_data = await maybe_prefill(req_data, p_url, req_id)
 
@@ -349,6 +388,10 @@ async def forward_stream(
     try:
         # Step 1: Process through Encoder instance (if has MM input)
         await fanout_encoder_primer(req_data, e_urls, req_id)
+
+        # Step 1b: Strip file:// URLs — encoder already cached them by uuid;
+        # prefill/decode pods don't have --allowed-local-media-path
+        req_data = strip_local_file_urls(req_data)
 
         # Step 2: Process through Prefill instance
         req_data = await maybe_prefill(req_data, p_url, req_id)

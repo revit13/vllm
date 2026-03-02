@@ -84,16 +84,30 @@ class ECExampleConnector(ECConnectorBase):
                 "In connector.start_load_caches, but the connector metadata is None"
             )
             return
+        if not metadata.mm_datas:
+            logger.info("[EC-CONSUMER] start_load_caches: no mm_datas in metadata, "
+                        "nothing to load from EC connector")
+            return
+        logger.info("[EC-CONSUMER] start_load_caches: loading %d mm item(s) from EC "
+                    "connector (shared_storage_path=%s)",
+                    len(metadata.mm_datas), self._storage_path)
         # Load the EC for each mm data
         for mm_data in metadata.mm_datas:
             if mm_data.mm_hash in encoder_cache:
+                logger.info("[EC-CONSUMER] mm_hash=%s already in local encoder_cache, "
+                            "skipping load", mm_data.mm_hash)
                 continue
             filename = self._generate_filename_debug(mm_data.mm_hash)
+            logger.info("[EC-CONSUMER] Loading encoder cache from file: %s "
+                        "(mm_hash=%s, num_tokens=%d)",
+                        filename, mm_data.mm_hash, mm_data.num_token)
             ec_cache = safetensors.torch.load_file(
                 filename, device=current_platform.device_type
             )["ec_cache"]
             encoder_cache[mm_data.mm_hash] = ec_cache
-            logger.debug("Success load encoder cache for hash %s", mm_data.mm_hash)
+            logger.info("[EC-CONSUMER] SUCCESS loaded encoder cache for mm_hash=%s "
+                        "shape=%s dtype=%s", mm_data.mm_hash,
+                        tuple(ec_cache.shape), ec_cache.dtype)
 
     def save_caches(self, encoder_cache, mm_hash, **kwargs) -> None:
         """
@@ -110,12 +124,17 @@ class ECExampleConnector(ECConnectorBase):
         """
         # Return if it is PD Instance
         if not self.is_producer:
+            logger.debug("[EC-PRODUCER] save_caches called but this is a consumer "
+                         "instance, skipping save for mm_hash=%s", mm_hash)
             return
         filename = self._generate_filename_debug(mm_hash)
         ec_cache = encoder_cache[mm_hash]
         tensors = {"ec_cache": ec_cache.detach().cpu()}
+        logger.info("[EC-PRODUCER] Saving encoder cache to file: %s "
+                    "(mm_hash=%s, shape=%s dtype=%s)",
+                    filename, mm_hash, tuple(ec_cache.shape), ec_cache.dtype)
         safetensors.torch.save_file(tensors, filename)
-        logger.debug("Save cache successful for mm_hash %s", mm_hash)
+        logger.info("[EC-PRODUCER] SUCCESS saved encoder cache for mm_hash=%s", mm_hash)
 
     def has_cache_item(
         self,
@@ -130,7 +149,16 @@ class ECExampleConnector(ECConnectorBase):
         Returns:
             Bool indicate that media exists in cache or not
         """
-        return self._found_match_for_mm_data(identifier)
+        result = self._found_match_for_mm_data(identifier)
+        if result:
+            logger.info("[EC-CONNECTOR] has_cache_item HIT for identifier=%s "
+                        "(file=%s)", identifier,
+                        self._generate_filename_debug(identifier))
+        else:
+            logger.info("[EC-CONNECTOR] has_cache_item MISS for identifier=%s "
+                        "(file not found at %s)", identifier,
+                        self._generate_filename_debug(identifier))
+        return result
 
     def update_state_after_alloc(
         self,

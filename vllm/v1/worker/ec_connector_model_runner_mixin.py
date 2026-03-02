@@ -32,7 +32,16 @@ class ECConnectorModelRunnerMixin:
             logger.debug("Not have ec transfer please check")
             return
         connector = get_ec_transfer()
+        logger.info(
+            "[EC-PRODUCER] maybe_save_ec_to_connector: dispatching save_caches "
+            "to connector=%s for mm_hash=%s",
+            type(connector).__name__, mm_hash,
+        )
         connector.save_caches(encoder_cache=encoder_cache, mm_hash=mm_hash)
+        logger.info(
+            "[EC-PRODUCER] maybe_save_ec_to_connector: save_caches completed "
+            "for mm_hash=%s", mm_hash,
+        )
 
     @staticmethod
     def get_finished_ec_transfers(
