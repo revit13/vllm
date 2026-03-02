@@ -198,6 +198,19 @@ class ECExampleConnector(ECConnectorBase):
     def _found_match_for_mm_data(self, mm_hash) -> bool:
         """Check if the cache is hit for the request."""
         filename = self._generate_filename_debug(mm_hash)
+        # Log available mm_hashes (subdirectories) in the storage path
+        try:
+            available = [
+                d for d in os.listdir(self._storage_path)
+                if os.path.isdir(os.path.join(self._storage_path, d))
+            ]
+        except FileNotFoundError:
+            available = []
+        logger.info(
+            "[EC-CONNECTOR] _found_match_for_mm_data: looking for mm_hash=%s, "
+            "available mm_hashes in storage (%s): %s",
+            mm_hash, self._storage_path, available,
+        )
         return os.path.exists(filename)
 
     def _generate_foldername_debug(

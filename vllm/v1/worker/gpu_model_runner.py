@@ -2316,16 +2316,19 @@ class GPUModelRunner(
         )
 
         if not mm_kwargs:
-            logger.debug(
-                "_execute_mm_encoder: no mm inputs to encode after batching "
-                "(scheduled_encoder_inputs=%d req(s) but all data was None)",
+            logger.info(
+                "[EC-PRODUCER] _execute_mm_encoder: no mm inputs to encode "
+                "(mm_hashes=%s, scheduled_encoder_inputs=%d req(s), "
+                "mm_kwargs empty - data may be None or already cached)",
+                mm_hashes,
                 len(scheduler_output.scheduled_encoder_inputs),
             )
             return []
 
-        logger.debug(
-            "_execute_mm_encoder: encoding %d multimodal item(s) for batch",
-            len(mm_kwargs),
+        logger.info(
+            "[EC-PRODUCER] _execute_mm_encoder: encoding %d multimodal item(s) "
+            "for batch, mm_hashes=%s",
+            len(mm_kwargs), mm_hashes,
         )
 
         should_time = bool(
@@ -3403,12 +3406,23 @@ class GPUModelRunner(
             self._update_states(scheduler_output)
 
             if has_ec_transfer() and get_ec_transfer().is_producer:
+                logger.info(
+                    "[EC-PRODUCER] execute_model: entering producer-only branch, "
+                    "scheduled_encoder_inputs=%s total_num_scheduled_tokens=%d",
+                    list(scheduler_output.scheduled_encoder_inputs.keys()),
+                    scheduler_output.total_num_scheduled_tokens,
+                )
                 with self.maybe_get_ec_connector_output(
                     scheduler_output,
                     encoder_cache=self.encoder_cache,
                 ) as ec_connector_output:
                     self._execute_mm_encoder(scheduler_output)
                     return make_empty_encoder_model_runner_output(scheduler_output)
+            elif has_ec_transfer():
+                logger.info(
+                    "[EC-CONSUMER] execute_model: EC transfer active but not producer "
+                    "(is_consumer), proceeding with normal execution"
+                )
 
             if not num_scheduled_tokens:
                 if (
