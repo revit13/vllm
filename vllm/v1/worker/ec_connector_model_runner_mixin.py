@@ -57,12 +57,20 @@ class ECConnectorModelRunnerMixin:
         encoder_cache: dict[str, torch.Tensor],
         **kwargs,
     ) -> AbstractContextManager[ECConnectorOutput | None]:
-        return (
-            ECConnectorModelRunnerMixin._get_ec_connector_output(
-                scheduler_output, encoder_cache, **kwargs
+        if not has_ec_transfer():
+            logger.info(
+                "[EC-MIXIN] maybe_get_ec_connector_output: no EC transfer registered, "
+                "skipping EC connector (ec_connector_metadata=%s)",
+                scheduler_output.ec_connector_metadata,
             )
-            if has_ec_transfer()
-            else nullcontext()
+            return nullcontext()
+        logger.info(
+            "[EC-MIXIN] maybe_get_ec_connector_output: EC transfer active, "
+            "ec_connector_metadata present=%s",
+            scheduler_output.ec_connector_metadata is not None,
+        )
+        return ECConnectorModelRunnerMixin._get_ec_connector_output(
+            scheduler_output, encoder_cache, **kwargs
         )
 
     # This context manager must be used within an active forward context.
@@ -81,7 +89,19 @@ class ECConnectorModelRunnerMixin:
         assert scheduler_output.ec_connector_metadata is not None
         ec_connector.bind_connector_metadata(scheduler_output.ec_connector_metadata)
 
+        logger.info(
+            "[EC-MIXIN] _get_ec_connector_output: connector=%s is_producer=%s "
+            "ec_connector_metadata=%s",
+            type(ec_connector).__name__,
+            ec_connector.is_producer,
+            scheduler_output.ec_connector_metadata,
+        )
+
         if not ec_connector.is_producer:
+            logger.info(
+                "[EC-CONSUMER] _get_ec_connector_output: calling start_load_caches, "
+                "encoder_cache has %d entries", len(encoder_cache),
+            )
             ec_connector.start_load_caches(encoder_cache, **kwargs)
 
         try:

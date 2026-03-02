@@ -137,6 +137,16 @@ class Scheduler(SchedulerInterface):
             self.ec_connector = ECConnectorFactory.create_connector(
                 config=self.vllm_config, role=ECConnectorRole.SCHEDULER
             )
+            logger.info(
+                "[EC-SCHEDULER] EC connector initialized: connector=%s role=%s "
+                "is_producer=%s is_consumer=%s",
+                type(self.ec_connector).__name__,
+                self.vllm_config.ec_transfer_config.ec_role,
+                self.vllm_config.ec_transfer_config.is_ec_producer,
+                self.vllm_config.ec_transfer_config.is_ec_consumer,
+            )
+        else:
+            logger.info("[EC-SCHEDULER] No EC transfer config found, EC connector disabled")
 
         num_gpu_blocks = self.cache_config.num_gpu_blocks
         assert num_gpu_blocks is not None and num_gpu_blocks > 0
@@ -1192,13 +1202,17 @@ class Scheduler(SchedulerInterface):
             if curr_embeds_end - curr_embeds_start == 0:
                 continue
 
-            if self.ec_connector is not None and self.ec_connector.has_cache_item(
-                item_identifier
-            ):
-                mm_hashes_to_schedule.add(item_identifier)
-                external_load_encoder_input.append(i)
-                num_embeds_to_schedule += num_encoder_embeds
-                continue
+            if self.ec_connector is not None:
+                cache_hit = self.ec_connector.has_cache_item(item_identifier)
+                logger.info(
+                    "[EC-SCHEDULER] has_cache_item check: identifier=%s hit=%s",
+                    item_identifier, cache_hit,
+                )
+                if cache_hit:
+                    mm_hashes_to_schedule.add(item_identifier)
+                    external_load_encoder_input.append(i)
+                    num_embeds_to_schedule += num_encoder_embeds
+                    continue
 
             num_embeds_to_schedule += num_encoder_embeds
             encoder_compute_budget -= num_encoder_embeds
