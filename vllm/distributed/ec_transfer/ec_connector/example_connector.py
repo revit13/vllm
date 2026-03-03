@@ -110,8 +110,10 @@ class ECExampleConnector(ECConnectorBase):
             encoder_cache[mm_data.mm_hash] = ec_cache
             logger.info(
                 "[ENCODER-CACHE] Loaded from EC connector shared storage to encoder_cache: "
-                "mm_hash=%s shape=%s dtype=%s file=%s",
+                "mm_hash=%s shape=%s dtype=%s file=%s, "
+                "encoder_cache now contains %d items: %s",
                 mm_data.mm_hash, tuple(ec_cache.shape), ec_cache.dtype, filename,
+                len(encoder_cache), list(encoder_cache.keys()),
             )
 
     def save_caches(self, encoder_cache, mm_hash, **kwargs) -> None:
