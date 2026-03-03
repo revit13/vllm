@@ -2571,11 +2571,21 @@ class GPUModelRunner(
 
                 mm_hash = mm_feature.identifier
                 encoder_output = self.encoder_cache.get(mm_hash, None)
-                logger.debug(
-                    "Gather mm embeddings: cache %s for mm_hash=%s (req_id=%s)",
-                    "HIT" if encoder_output is not None else "MISS",
-                    mm_hash, req_id,
-                )
+                if encoder_output is not None:
+                    logger.info(
+                        "[ENCODER-CACHE] Using cached encoder output from encoder_cache: "
+                        "mm_hash=%s shape=%s dtype=%s device=%s (req_id=%s), "
+                        "encoder_cache contains %d items: %s",
+                        mm_hash, tuple(encoder_output.shape), encoder_output.dtype,
+                        encoder_output.device, req_id,
+                        len(self.encoder_cache), list(self.encoder_cache.keys()),
+                    )
+                else:
+                    logger.error(
+                        "[ENCODER-CACHE] MISS in encoder_cache during gather: mm_hash=%s (req_id=%s), "
+                        "encoder_cache contains %d items: %s",
+                        mm_hash, req_id, len(self.encoder_cache), list(self.encoder_cache.keys()),
+                    )
                 assert encoder_output is not None, f"Encoder cache miss for {mm_hash}."
 
                 if (is_embed := pos_info.is_embed) is not None:
