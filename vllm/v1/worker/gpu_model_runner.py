@@ -2476,6 +2476,11 @@ class GPUModelRunner(
         # Cache the encoder outputs by mm_hash
         for mm_hash, output in zip(mm_hashes, encoder_outputs):
             self.encoder_cache[mm_hash] = output
+            logger.info(
+                "[ENCODER-CACHE] Stored locally computed encoder output to encoder_cache: "
+                "mm_hash=%s shape=%s dtype=%s device=%s",
+                mm_hash, tuple(output.shape), output.dtype, output.device,
+            )
             # Print embedding summary: shape, stats, and first few values
             _out_cpu = output.float().cpu()
             logger.debug(

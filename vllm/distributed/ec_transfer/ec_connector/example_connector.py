@@ -105,9 +105,11 @@ class ECExampleConnector(ECConnectorBase):
                 filename, device=current_platform.device_type
             )["ec_cache"]
             encoder_cache[mm_data.mm_hash] = ec_cache
-            logger.info("[EC-CONSUMER] SUCCESS loaded encoder cache for mm_hash=%s "
-                        "shape=%s dtype=%s", mm_data.mm_hash,
-                        tuple(ec_cache.shape), ec_cache.dtype)
+            logger.info(
+                "[ENCODER-CACHE] Loaded from EC connector shared storage to encoder_cache: "
+                "mm_hash=%s shape=%s dtype=%s file=%s",
+                mm_data.mm_hash, tuple(ec_cache.shape), ec_cache.dtype, filename,
+            )
 
     def save_caches(self, encoder_cache, mm_hash, **kwargs) -> None:
         """
@@ -134,7 +136,11 @@ class ECExampleConnector(ECConnectorBase):
                     "(mm_hash=%s, shape=%s dtype=%s)",
                     filename, mm_hash, tuple(ec_cache.shape), ec_cache.dtype)
         safetensors.torch.save_file(tensors, filename)
-        logger.info("[EC-PRODUCER] SUCCESS saved encoder cache for mm_hash=%s", mm_hash)
+        logger.info(
+            "[ENCODER-CACHE] Saved to EC connector shared storage: "
+            "mm_hash=%s shape=%s dtype=%s file=%s",
+            mm_hash, tuple(ec_cache.shape), ec_cache.dtype, filename,
+        )
 
     def has_cache_item(
         self,
