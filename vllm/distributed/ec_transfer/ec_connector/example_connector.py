@@ -94,8 +94,11 @@ class ECExampleConnector(ECConnectorBase):
         # Load the EC for each mm data
         for mm_data in metadata.mm_datas:
             if mm_data.mm_hash in encoder_cache:
-                logger.info("[EC-CONSUMER] mm_hash=%s already in local encoder_cache, "
-                            "skipping load", mm_data.mm_hash)
+                logger.info(
+                    "[ENCODER-CACHE] Already in encoder_cache (skipping EC connector load): "
+                    "mm_hash=%s (was loaded in previous request or earlier in this batch)",
+                    mm_data.mm_hash,
+                )
                 continue
             filename = self._generate_filename_debug(mm_data.mm_hash)
             logger.info("[EC-CONSUMER] Loading encoder cache from file: %s "
