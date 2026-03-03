@@ -2317,17 +2317,16 @@ class GPUModelRunner(
 
         if not mm_kwargs:
             logger.info(
-                "[EC-PRODUCER] _execute_mm_encoder: no mm inputs to encode "
+                "_execute_mm_encoder: no mm inputs to encode "
                 "(mm_hashes=%s, scheduled_encoder_inputs=%d req(s), "
-                "mm_kwargs empty - data may be None or already cached)",
+                "mm_kwargs empty - data already in cache or loaded from EC connector)",
                 mm_hashes,
                 len(scheduler_output.scheduled_encoder_inputs),
             )
             return []
 
         logger.info(
-            "[EC-PRODUCER] _execute_mm_encoder: encoding %d multimodal item(s) "
-            "for batch, mm_hashes=%s",
+            "_execute_mm_encoder: encoding %d multimodal item(s) for batch, mm_hashes=%s",
             len(mm_kwargs), mm_hashes,
         )
 
