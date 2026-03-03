@@ -107,8 +107,9 @@ class EncoderCacheManager:
         # Not cached at all
         if mm_hash not in self.cached:
             logger.info(
-                "MM encoder cache MISS for mm_hash=%s (req_id=%s, input_id=%d)",
-                mm_hash, request.request_id, input_id,
+                "MM encoder cache MISS for mm_hash=%s (req_id=%s, input_id=%d), "
+                "available_hashes=%s",
+                mm_hash, request.request_id, input_id, list(self.cached.keys()),
             )
             return False
 
@@ -118,13 +119,14 @@ class EncoderCacheManager:
             self.num_freeable_slots -= num_encoder_embeds
             logger.info(
                 "MM encoder cache HIT (was freeable) for mm_hash=%s "
-                "(req_id=%s, input_id=%d)",
-                mm_hash, request.request_id, input_id,
+                "(req_id=%s, input_id=%d), available_hashes=%s",
+                mm_hash, request.request_id, input_id, list(self.cached.keys()),
             )
         else:
             logger.info(
-                "MM encoder cache HIT for mm_hash=%s (req_id=%s, input_id=%d)",
-                mm_hash, request.request_id, input_id,
+                "MM encoder cache HIT for mm_hash=%s (req_id=%s, input_id=%d), "
+                "available_hashes=%s",
+                mm_hash, request.request_id, input_id, list(self.cached.keys()),
             )
 
         self.cached[mm_hash].add(request.request_id)
