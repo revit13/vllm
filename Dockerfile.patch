@@ -1,7 +1,7 @@
 FROM vllm/vllm-openai:v0.16.0
 
 # Base image already contains all compiled .so extensions for v0.16.0.
-# We only overwrite the two Python files that have debug log patches.
+# We only overwrite the Python files that have debug log patches.
 # No recompilation needed — build is fast (seconds).
 #
 # Find the installed vllm path:
@@ -11,8 +11,9 @@ FROM vllm/vllm-openai:v0.16.0
 ARG VLLM_SITE=/usr/local/lib/python3.12/dist-packages/vllm
 
 # Overwrite only the patched files (git checkout v0.16.0 ensures compatibility)
-COPY vllm/v1/core/encoder_cache_manager.py        ${VLLM_SITE}/v1/core/encoder_cache_manager.py
-COPY vllm/v1/worker/gpu_model_runner.py           ${VLLM_SITE}/v1/worker/gpu_model_runner.py
-COPY vllm/v1/worker/gpu/mm/encoder_runner.py      ${VLLM_SITE}/v1/worker/gpu/mm/encoder_runner.py
+COPY vllm/v1/core/encoder_cache_manager.py                      ${VLLM_SITE}/v1/core/encoder_cache_manager.py
+COPY vllm/v1/worker/gpu_model_runner.py                         ${VLLM_SITE}/v1/worker/gpu_model_runner.py
+COPY vllm/v1/worker/gpu/mm/encoder_runner.py                    ${VLLM_SITE}/v1/worker/gpu/mm/encoder_runner.py
+COPY vllm/distributed/ec_transfer/ec_connector/example_connector.py  ${VLLM_SITE}/distributed/ec_transfer/ec_connector/example_connector.py
 
 # Made with Bob
