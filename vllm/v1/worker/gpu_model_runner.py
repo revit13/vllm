@@ -3500,9 +3500,11 @@ class GPUModelRunner(
                 num_encoder_reqs=len(scheduler_output.scheduled_encoder_inputs),
             )
 
-            logger.debug(
-                "Running batch with cudagraph_mode: %s, batch_descriptor: %s, "
+            phase = "PREFILL" if cudagraph_mode.name == "PIECEWISE" else "DECODE"
+            logger.info(
+                "[%s] Running batch with cudagraph_mode: %s, batch_descriptor: %s, "
                 "should_ubatch: %s, num_tokens_across_dp: %s",
+                phase,
                 cudagraph_mode,
                 batch_desc,
                 should_ubatch,
