@@ -661,6 +661,17 @@ class InputProcessor:
                     )
                 )
 
+        # Log the tokenized prompt
+        if prompt_token_ids is not None:
+            logger.info(
+                "[TOKENIZATION] Prompt after tokenization: num_tokens=%d "
+                "token_ids=%s (req_id=%s)",
+                len(prompt_token_ids),
+                prompt_token_ids if len(prompt_token_ids) <= 50 else
+                f"{prompt_token_ids[:25]} ... {prompt_token_ids[-25:]} (truncated, total={len(prompt_token_ids)})",
+                request_id,
+            )
+        
         return EngineCoreRequest(
             request_id=request_id,
             prompt_token_ids=prompt_token_ids,
