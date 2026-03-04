@@ -24,6 +24,7 @@ Available tests:
   local-file        Local File Path (Requires --allowed-local-media-path)
   image-embeds      Direct Image Embeddings Input (Requires --enable-mm-embeds)
   video             Video Input
+  placeholder       Placeholder Token Test (Shows <image> token replacement)
 
 Examples:
   $0                              # run all tests
@@ -97,7 +98,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ALL_TESTS=(image-uuid image-no-uuid image-cached multi-image local-file image-embeds video)
+ALL_TESTS=(image-uuid image-no-uuid image-cached multi-image local-file image-embeds video placeholder)
 
 # Build a set of test names to run
 declare -A RUN_TEST
@@ -302,6 +303,48 @@ test_video() {
   run_curl "$data"
 }
 
+test_placeholder() {
+  echo -e "\n\n========================================================="
+  echo "placeholder: Placeholder Token Test (Shows <image> token replacement)"
+  echo "========================================================="
+  echo ">> This test demonstrates how placeholder tokens work:"
+  echo ">>   1. Text 'What is in <image>?' gets tokenized"
+  echo ">>   2. <image> becomes a placeholder token (e.g., token ID 32000)"
+  echo ">>   3. During prefill, the placeholder token is replaced with image embeddings"
+  echo ">>   4. Check server logs for [PLACEHOLDER-TOKEN] to see the replacement"
+  echo ""
+  echo ">> Expected logs on server:"
+  echo ">>   [PLACEHOLDER-TOKEN] Found placeholder token: modality=image ..."
+  echo ">>   [MM-HASH] Created MMFeature: base_mm_hash=poodle-..."
+  echo ">>   [ENCODER-CACHE] Using cached encoder output: mm_hash=poodle-..."
+  echo ""
+  local data='{
+    "model": "'"$MODEL"'",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "Describe what you see in this image in detail."},
+          {
+            "type": "image_url",
+            "image_url": {"url": "https://images.dog.ceo/breeds/poodle-standard/n02113799_2280.jpg"},
+            "uuid": "placeholder-test-image"
+          }
+        ]
+      }
+    ],
+    "max_tokens": 100
+  }'
+  run_curl "$data"
+  echo ""
+  echo ">> To see placeholder token processing in server logs, look for:"
+  echo ">>   [PLACEHOLDER-TOKEN] - Shows where <image> token was found"
+  echo ">>   [MM-HASH] - Shows the hash computed from image data"
+  echo ">>   [KV-CACHE-PREFILL] - Shows KV cache block hash computation"
+  echo ">>   [PREFILL] - Shows the actual model execution"
+  echo ">>   [ENCODER-CACHE] - Shows image embeddings being used"
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch map: test name (with hyphens) -> function name (with underscores)
 # ---------------------------------------------------------------------------
@@ -313,6 +356,7 @@ DISPATCH["multi-image"]=test_multi_image
 DISPATCH["local-file"]=test_local_file
 DISPATCH["image-embeds"]=test_image_embeds
 DISPATCH["video"]=test_video
+DISPATCH["placeholder"]=test_placeholder
 
 # ---------------------------------------------------------------------------
 # Run selected tests in order

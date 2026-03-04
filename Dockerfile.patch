@@ -12,8 +12,11 @@ ARG VLLM_SITE=/usr/local/lib/python3.12/dist-packages/vllm
 
 # Overwrite only the patched files (git checkout v0.16.0 ensures compatibility)
 COPY vllm/v1/core/encoder_cache_manager.py                      ${VLLM_SITE}/v1/core/encoder_cache_manager.py
+COPY vllm/v1/core/kv_cache_utils.py                             ${VLLM_SITE}/v1/core/kv_cache_utils.py
 COPY vllm/v1/worker/gpu_model_runner.py                         ${VLLM_SITE}/v1/worker/gpu_model_runner.py
 COPY vllm/v1/worker/gpu/mm/encoder_runner.py                    ${VLLM_SITE}/v1/worker/gpu/mm/encoder_runner.py
 COPY vllm/distributed/ec_transfer/ec_connector/example_connector.py  ${VLLM_SITE}/distributed/ec_transfer/ec_connector/example_connector.py
+COPY vllm/v1/engine/input_processor.py                          ${VLLM_SITE}/v1/engine/input_processor.py
+COPY vllm/multimodal/processing/processor.py                    ${VLLM_SITE}/multimodal/processing/processor.py
 
 # Made with Bob

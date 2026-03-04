@@ -640,14 +640,22 @@ class InputProcessor:
             mm_features = []
             for modality, idx in sorted_mm_idxs:
                 base_mm_hash = decoder_mm_hashes[modality][idx]
+                identifier = self._get_mm_identifier(
+                    base_mm_hash,
+                    lora_request,
+                )
+                logger.info(
+                    "[MM-HASH] Created MMFeature: base_mm_hash=%s identifier=%s "
+                    "modality=%s lora=%s (req_id=%s)",
+                    base_mm_hash, identifier, modality,
+                    lora_request.lora_name if lora_request else "None",
+                    request_id,
+                )
                 mm_features.append(
                     MultiModalFeatureSpec(
                         data=decoder_mm_inputs[modality][idx],
                         modality=modality,
-                        identifier=self._get_mm_identifier(
-                            base_mm_hash,
-                            lora_request,
-                        ),
+                        identifier=identifier,
                         mm_position=decoder_mm_positions[modality][idx],
                         mm_hash=base_mm_hash,
                     )

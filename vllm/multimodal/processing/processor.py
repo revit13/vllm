@@ -936,7 +936,20 @@ def find_mm_placeholders(
     tokenizer: TokenizerLike | None,
 ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
     it = _iter_placeholders(prompt, mm_prompt_updates, tokenizer)
-    return dict(full_groupby_modality(it))
+    result = dict(full_groupby_modality(it))
+    
+    # Log placeholder token information
+    from vllm.logger import logger
+    for modality, placeholders in result.items():
+        for placeholder in placeholders:
+            logger.info(
+                "[PLACEHOLDER-TOKEN] Found placeholder token: modality=%s item_idx=%d "
+                "start_idx=%d length=%d tokens=%s (will replace with %d embedding(s))",
+                modality, placeholder.item_idx, placeholder.start_idx,
+                placeholder.length, placeholder.tokens, placeholder.length,
+            )
+    
+    return result
 
 
 MultiModalIsCached = dict[str, list[bool]]

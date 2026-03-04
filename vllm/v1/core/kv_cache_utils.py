@@ -596,6 +596,17 @@ def get_request_block_hasher(
             block_hash = hash_block_tokens(
                 caching_hash_fn, prev_block_hash_value, block_tokens, extra_keys
             )
+            
+            from vllm.logger import logger
+            logger.info(
+                "[KV-CACHE-PREFILL] Computed block hash for KV cache prefix caching: "
+                "block_idx=%d token_range=%d-%d num_tokens=%d has_extra_keys=%s "
+                "(req_id=%s)",
+                len(request.block_hashes) + len(new_block_hashes),
+                start_token_idx, end_token_idx, len(block_tokens),
+                extra_keys is not None and len(extra_keys) > 0,
+                request.request_id,
+            )
 
             new_block_hashes.append(block_hash)
             start_token_idx += block_size
