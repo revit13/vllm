@@ -598,13 +598,20 @@ def get_request_block_hasher(
             )
             
             from vllm.logger import logger
+            
+            # Build detailed extra_keys info for logging
+            extra_keys_str = "none"
+            if extra_keys is not None and len(extra_keys) > 0:
+                # Show actual content of extra_keys
+                extra_keys_str = str(extra_keys)
+            
             logger.info(
                 "[KV-CACHE-PREFILL] Computed block hash for KV cache prefix caching: "
-                "block_idx=%d token_range=%d-%d num_tokens=%d has_extra_keys=%s "
+                "block_idx=%d token_range=%d-%d num_tokens=%d extra_keys=%s "
                 "(req_id=%s)",
                 len(request.block_hashes) + len(new_block_hashes),
                 start_token_idx, end_token_idx, len(block_tokens),
-                extra_keys is not None and len(extra_keys) > 0,
+                extra_keys_str,
                 request.request_id,
             )
 

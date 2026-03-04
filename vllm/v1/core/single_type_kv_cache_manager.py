@@ -424,6 +424,8 @@ class FullAttentionManager(SingleTypeKVCacheManager):
         if dcp_world_size * pcp_world_size > 1:
             block_size *= dcp_world_size * pcp_world_size
         max_num_blocks = max_length // block_size
+        from vllm.logger import logger
+        block_idx = 0
         for block_hash in itertools.islice(block_hashes, max_num_blocks):
             # block_hashes is a chain of block hashes. If a block hash is not
             # in the cached_block_hash_to_id, the following block hashes are
@@ -431,9 +433,19 @@ class FullAttentionManager(SingleTypeKVCacheManager):
             if cached_block := block_pool.get_cached_block(
                 block_hash, kv_cache_group_ids
             ):
+                logger.info(
+                    "[KV-CACHE-LOOKUP] Cache HIT: block_idx=%d block_hash=%s",
+                    block_idx, block_hash.hex()[:16]
+                )
                 for computed, cached in zip(computed_blocks, cached_block):
                     computed.append(cached)
+                block_idx += 1
             else:
+                logger.info(
+                    "[KV-CACHE-LOOKUP] Cache MISS: block_idx=%d block_hash=%s "
+                    "(stopping prefix cache lookup)",
+                    block_idx, block_hash.hex()[:16]
+                )
                 break
         if use_eagle and computed_blocks[0]:
             # Need to drop the last matched block if eagle is enabled.
