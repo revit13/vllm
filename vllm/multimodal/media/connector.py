@@ -139,7 +139,18 @@ class MediaConnector:
         *,
         fetch_timeout: int | None = None,
     ) -> _M:  # type: ignore[type-var]
+        from vllm.logger import init_logger
+        logger = init_logger(__name__)
+        logger.info(
+            "[MEDIA-LOAD] load_from_url called with URL: %s (scheme will be determined)",
+            url[:100] if len(url) > 100 else url  # Truncate long data URLs
+        )
+        
         url_spec = parse_url(url)
+        logger.info(
+            "[MEDIA-LOAD] Parsed URL scheme: %s",
+            url_spec.scheme
+        )
 
         if url_spec.scheme and url_spec.scheme.startswith("http"):
             self._assert_url_in_allowed_media_domains(url_spec)

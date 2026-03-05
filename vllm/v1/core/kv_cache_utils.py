@@ -551,26 +551,47 @@ def hash_block_tokens(
         The hash value of the block and the token ids in the block.
         The entire tuple is used as the hash key of the block.
     """
-    if not parent_block_hash:
+    from vllm.logger import init_logger
+    logger = init_logger(__name__)
+    
+    is_first_block = not parent_block_hash
+    if is_first_block:
         parent_block_hash = NONE_HASH
-        from vllm.logger import init_logger
-        logger = init_logger(__name__)
         logger.info(
             "[BLOCK-HASH] Computing FIRST block hash (block_idx=0) using NONE_HASH seed: "
             "seed_hash=%s, num_tokens=%d, extra_keys=%s",
             parent_block_hash.hex()[:16], len(curr_block_token_ids), extra_keys
         )
+    else:
+        logger.info(
+            "[BLOCK-HASH] Computing block hash: "
+            "parent_hash=%s, num_tokens=%d, extra_keys=%s",
+            parent_block_hash.hex()[:16], len(curr_block_token_ids), extra_keys
+        )
 
     curr_block_token_ids_tuple = tuple(curr_block_token_ids)
+    
+    # Log the actual hash computation inputs
+    logger.info(
+        "[BLOCK-HASH] Hash computation inputs: "
+        "parent_hash=%s, token_ids=%s, extra_keys=%s",
+        parent_block_hash.hex()[:16],
+        str(curr_block_token_ids_tuple[:5]) + "..." if len(curr_block_token_ids_tuple) > 5 else str(curr_block_token_ids_tuple),
+        extra_keys
+    )
+    
     block_hash = BlockHash(
         hash_function((parent_block_hash, curr_block_token_ids_tuple, extra_keys))
     )
     
-    if parent_block_hash == NONE_HASH:
-        from vllm.logger import init_logger
-        logger = init_logger(__name__)
+    if is_first_block:
         logger.info(
             "[BLOCK-HASH] Computed FIRST block hash (block_idx=0): hash=%s",
+            block_hash.hex()[:16]
+        )
+    else:
+        logger.info(
+            "[BLOCK-HASH] Computed block hash: hash=%s",
             block_hash.hex()[:16]
         )
     

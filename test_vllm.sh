@@ -43,7 +43,7 @@ CURL_TIMEOUT="${CURL_TIMEOUT:-60}"   # seconds, override with: export CURL_TIMEO
 run_curl() {
   local data="$1"
   echo ">> curl command:"
-  echo "   curl -s --max-time $CURL_TIMEOUT -w '\\nHTTP_STATUS:%{http_code}' $API_URL \\"
+  echo "   curl -s -v --max-time $CURL_TIMEOUT -w '\\nHTTP_STATUS:%{http_code}' $API_URL \\"
   echo "     -H 'Content-Type: application/json' \\"
   echo "     -d '$data'"
   echo ""
