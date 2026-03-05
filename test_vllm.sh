@@ -25,6 +25,7 @@ Available tests:
   image-embeds      Direct Image Embeddings Input (Requires --enable-mm-embeds)
   video             Video Input
   placeholder       Placeholder Token Test (Shows <image> token replacement)
+  two-images        Two Images Test (Shows multiple mm_hash handling)
 
 Examples:
   $0                              # run all tests
@@ -98,7 +99,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ALL_TESTS=(image-uuid image-no-uuid image-cached multi-image local-file image-embeds video placeholder)
+ALL_TESTS=(image-uuid image-no-uuid image-cached multi-image local-file image-embeds video placeholder two-images)
 
 # Build a set of test names to run
 declare -A RUN_TEST
@@ -345,6 +346,59 @@ test_placeholder() {
   echo ">>   [ENCODER-CACHE] - Shows image embeddings being used"
 }
 
+test_two_images() {
+  echo -e "\n\n========================================================="
+  echo "two-images: Two Images Test (Shows multiple mm_hash handling)"
+  echo "========================================================="
+  echo ">> This test demonstrates how multiple images are processed:"
+  echo ">>   1. Each image gets its own mm_hash computed"
+  echo ">>   2. Each image gets its own placeholder tokens"
+  echo ">>   3. Both mm_hashes are included in KV cache block hashes"
+  echo ">>   4. Check server logs for multiple [MM-HASH] and [PLACEHOLDER-TOKEN] entries"
+  echo ""
+  echo ">> Expected logs on server:"
+  echo ">>   [MM-HASH] Created MMFeature: base_mm_hash=poodle-... (image 1)"
+  echo ">>   [MM-HASH] Created MMFeature: base_mm_hash=labrador-... (image 2)"
+  echo ">>   [PLACEHOLDER-TOKEN] Found placeholder token: item_idx=0 (image 1)"
+  echo ">>   [PLACEHOLDER-TOKEN] Found placeholder token: item_idx=1 (image 2)"
+  echo ">>   [KV-CACHE-PREFILL] extra_keys=('poodle-...', 'labrador-...')"
+  echo ">>   [ENCODER-CACHE] Using cached encoder output for both images"
+  echo ""
+  local data='{
+    "model": "'"$MODEL"'",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "Compare these two dog images. What breeds are they and what are the differences?"},
+          {
+            "type": "image_url",
+            "image_url": {"url": "https://images.dog.ceo/breeds/poodle-standard/n02113799_2280.jpg"},
+            "uuid": "two-images-poodle"
+          },
+          {
+            "type": "image_url",
+            "image_url": {"url": "https://images.dog.ceo/breeds/labrador/n02099712_4323.jpg"},
+            "uuid": "two-images-labrador"
+          }
+        ]
+      }
+    ],
+    "max_tokens": 150
+  }'
+  run_curl "$data"
+  echo ""
+  echo ">> To see two-image processing in server logs, look for:"
+  echo ">>   [MM-HASH] - Two separate hashes (one per image)"
+  echo ">>   [PLACEHOLDER-TOKEN] - Two placeholder token ranges"
+  echo ">>   [KV-CACHE-PREFILL] - Block hashes include both mm_hashes in extra_keys"
+  echo ">>   [ENCODER-CACHE] - Two separate encoder cache lookups/loads"
+  echo ">>   [PREFILL] - Single forward pass with both images' embeddings"
+  echo ""
+  echo ">> Key insight: Both mm_hashes are combined in block hash extra_keys,"
+  echo ">>              ensuring different image combinations produce different KV cache blocks"
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch map: test name (with hyphens) -> function name (with underscores)
 # ---------------------------------------------------------------------------
@@ -357,6 +411,7 @@ DISPATCH["local-file"]=test_local_file
 DISPATCH["image-embeds"]=test_image_embeds
 DISPATCH["video"]=test_video
 DISPATCH["placeholder"]=test_placeholder
+DISPATCH["two-images"]=test_two_images
 
 # ---------------------------------------------------------------------------
 # Run selected tests in order

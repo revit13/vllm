@@ -100,8 +100,16 @@ def init_none_hash(hash_fn: Callable[[Any], bytes]):
 
     if hash_seed is None:
         NONE_HASH = BlockHash(os.urandom(32))
+        logger.info(
+            "[BLOCK-HASH-SEED] Initialized NONE_HASH seed with random bytes (non-reproducible): %s",
+            NONE_HASH.hex()[:16]
+        )
     else:
         NONE_HASH = BlockHash(hash_fn(hash_seed))
+        logger.info(
+            "[BLOCK-HASH-SEED] Initialized NONE_HASH seed from PYTHONHASHSEED=%s (reproducible): %s",
+            hash_seed, NONE_HASH.hex()[:16]
+        )
 
 
 @dataclass
@@ -545,11 +553,28 @@ def hash_block_tokens(
     """
     if not parent_block_hash:
         parent_block_hash = NONE_HASH
+        from vllm.logger import init_logger
+        logger = init_logger(__name__)
+        logger.info(
+            "[BLOCK-HASH] Computing FIRST block hash (block_idx=0) using NONE_HASH seed: "
+            "seed_hash=%s, num_tokens=%d, extra_keys=%s",
+            parent_block_hash.hex()[:16], len(curr_block_token_ids), extra_keys
+        )
 
     curr_block_token_ids_tuple = tuple(curr_block_token_ids)
-    return BlockHash(
+    block_hash = BlockHash(
         hash_function((parent_block_hash, curr_block_token_ids_tuple, extra_keys))
     )
+    
+    if parent_block_hash == NONE_HASH:
+        from vllm.logger import init_logger
+        logger = init_logger(__name__)
+        logger.info(
+            "[BLOCK-HASH] Computed FIRST block hash (block_idx=0): hash=%s",
+            block_hash.hex()[:16]
+        )
+    
+    return block_hash
 
 
 def get_request_block_hasher(

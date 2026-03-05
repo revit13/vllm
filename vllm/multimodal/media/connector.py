@@ -144,11 +144,23 @@ class MediaConnector:
         if url_spec.scheme and url_spec.scheme.startswith("http"):
             self._assert_url_in_allowed_media_domains(url_spec)
 
+            from vllm.logger import init_logger
+            logger = init_logger(__name__)
+            logger.info(
+                "[MEDIA-DOWNLOAD] Downloading image from URL: %s (timeout=%s)",
+                url, fetch_timeout
+            )
+
             connection = self.connection
             data = connection.get_bytes(
                 url,
                 timeout=fetch_timeout,
                 allow_redirects=envs.VLLM_MEDIA_URL_ALLOW_REDIRECTS,
+            )
+
+            logger.info(
+                "[MEDIA-DOWNLOAD] Successfully downloaded image from URL: %s (size=%d bytes)",
+                url, len(data)
             )
 
             return media_io.load_bytes(data)
@@ -175,12 +187,25 @@ class MediaConnector:
         if url_spec.scheme and url_spec.scheme.startswith("http"):
             self._assert_url_in_allowed_media_domains(url_spec)
 
+            from vllm.logger import init_logger
+            logger = init_logger(__name__)
+            logger.info(
+                "[MEDIA-DOWNLOAD-ASYNC] Downloading image from URL: %s (timeout=%s)",
+                url, fetch_timeout
+            )
+
             connection = self.connection
             data = await connection.async_get_bytes(
                 url,
                 timeout=fetch_timeout,
                 allow_redirects=envs.VLLM_MEDIA_URL_ALLOW_REDIRECTS,
             )
+
+            logger.info(
+                "[MEDIA-DOWNLOAD-ASYNC] Successfully downloaded image from URL: %s (size=%d bytes)",
+                url, len(data)
+            )
+
             future = loop.run_in_executor(global_thread_pool, media_io.load_bytes, data)
             return await future
 
