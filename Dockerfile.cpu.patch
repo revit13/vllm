@@ -9,6 +9,6 @@ WORKDIR /workspace
 
 # The base image already has vllm installed, so we just need to ensure
 # the Python path includes our modified files
-ENV PYTHONPATH=/workspace:$PYTHONPATH
+ENV PYTHONPATH=/workspace
 
 # Made with Bob
