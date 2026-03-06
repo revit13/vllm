@@ -1,0 +1,14 @@
+FROM ghcr.io/revit13/vllm-cpu-local:dev-debug
+
+# Copy only the modified files
+COPY vllm/v1/core/encoder_cache_manager.py /workspace/vllm/v1/core/encoder_cache_manager.py
+COPY vllm/multimodal/processing/processor.py /workspace/vllm/multimodal/processing/processor.py
+
+# Set working directory
+WORKDIR /workspace
+
+# The base image already has vllm installed, so we just need to ensure
+# the Python path includes our modified files
+ENV PYTHONPATH=/workspace:$PYTHONPATH
+
+# Made with Bob
