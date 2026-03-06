@@ -1400,11 +1400,20 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             for idx in idxs:
                 data = mm_data_items[modality][idx]
                 if data is None:
+                    logger.error(
+                        "[DEBUG] Cache miss for %s at index %d but data is None. "
+                        "mm_data_items[%s] has %d items, checking index %d",
+                        modality, idx, modality, len(mm_data_items[modality]), idx
+                    )
                     raise ValueError(
                         f"Cache miss for {modality} at index {idx} "
                         f"but data is not provided."
                     )
                 else:
+                    logger.info(
+                        "[DEBUG] Cache miss for %s at index %d - data IS provided (type=%s)",
+                        modality, idx, type(data).__name__
+                    )
                     missing_modality_data.append(data)
             mm_missing_data[modality] = missing_modality_data
 
