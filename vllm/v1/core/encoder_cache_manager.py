@@ -111,6 +111,10 @@ class EncoderCacheManager:
                 "available_hashes=%s",
                 mm_hash, request.request_id, input_id, list(self.cached.keys()),
             )
+            logger.info(
+                "[DEBUG] Cache MISS - data location: request.mm_features[%d].data",
+                input_id,
+            )
             return False
 
         # Cached but currently not referenced by any request (was freeable)
