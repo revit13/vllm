@@ -1145,12 +1145,31 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
         Call the HF processor on the prompt text and
         associated multi-modal data.
         """
+        logger.info("[PREPROCESSING] Starting HF processor (resize, normalize, tile)")
+        logger.info("[PREPROCESSING] Input mm_data keys: %s", list(mm_data.keys()))
+        if "image" in mm_data:
+            images = mm_data["image"]
+            if isinstance(images, list):
+                logger.info("[PREPROCESSING] Processing %d images", len(images))
+            else:
+                logger.info("[PREPROCESSING] Processing single image")
+        
         with timed_preprocessor_operation(self.info.ctx, "hf_processor"):
-            return self.info.ctx.call_hf_processor(
+            result = self.info.ctx.call_hf_processor(
                 self.info.get_hf_processor(**mm_kwargs),
                 dict(text=prompt, **mm_data),
                 dict(**mm_kwargs, **tok_kwargs),
             )
+        
+        logger.info("[PREPROCESSING] HF processor completed. Output keys: %s", list(result.keys()))
+        if "pixel_values" in result:
+            pixel_values = result["pixel_values"]
+            if isinstance(pixel_values, torch.Tensor):
+                logger.info("[PREPROCESSING] pixel_values shape: %s", pixel_values.shape)
+            elif isinstance(pixel_values, list):
+                logger.info("[PREPROCESSING] pixel_values list with %d items", len(pixel_values))
+        
+        return result
 
     def _hf_processor_applies_updates(
         self,
@@ -1518,11 +1537,13 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
                 mm_uuids=mm_uuids,
             )
 
+        logger.info("[PROMPT UPDATES] Calculating prompt updates after HF preprocessing")
         mm_prompt_updates = self._get_mm_prompt_updates(
             mm_data_items,
             hf_processor_mm_kwargs,
             mm_kwargs,
         )
+        logger.info("[PROMPT UPDATES] Prompt updates calculated for modalities: %s", list(mm_prompt_updates.keys()))
 
         mm_info = MultiModalProcessingInfo(
             kwargs=mm_kwargs,
@@ -1640,10 +1661,26 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
     ) -> tuple[list[int], Mapping[str, list[PlaceholderFeaturesInfo]]]:
         tokenizer = self.info.get_tokenizer()
 
+        logger.info("[PLACEHOLDER EXPANSION] Starting placeholder expansion (1× IMG → N× IMG tokens)")
+        logger.info("[PLACEHOLDER EXPANSION] Input token_ids length: %d", len(token_ids))
+        logger.info("[PLACEHOLDER EXPANSION] Modalities to expand: %s", list(mm_prompt_updates.keys()))
+        
+        for modality, updates_list in mm_prompt_updates.items():
+            for item_idx, updates in enumerate(updates_list):
+                for update in updates:
+                    if hasattr(update.content, 'full'):
+                        num_tokens = len(update.content.full) if isinstance(update.content.full, list) else 0
+                    else:
+                        num_tokens = len(update.content) if isinstance(update.content, list) else 0
+                    logger.info("[PLACEHOLDER EXPANSION] %s[%d]: Expanding to %d tokens",
+                               modality, item_idx, num_tokens)
+
         new_token_ids, match_result = self._apply_token_matches(
             token_ids,
             mm_prompt_updates,
         )
+        
+        logger.info("[PLACEHOLDER EXPANSION] After expansion, token_ids length: %d", len(new_token_ids))
 
         # If the search text does not represent a special token,
         # it may have different token IDs in the prompt, because
