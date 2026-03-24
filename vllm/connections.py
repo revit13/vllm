@@ -8,7 +8,10 @@ import aiohttp
 import requests
 from urllib3.util import parse_url
 
+from vllm.logger import init_logger
 from vllm.version import __version__ as VLLM_VERSION
+
+logger = init_logger(__name__)
 
 
 class HTTPConnection:
@@ -61,9 +64,19 @@ class HTTPConnection:
         client = self.get_sync_client()
         extra_headers = extra_headers or {}
 
+        headers = self._headers(**extra_headers)
+        import os
+        logger.info(
+            "[HTTP-DOWNLOAD] GET %s headers=%s stream=%s timeout=%s "
+            "allow_redirects=%s proxy=%s",
+            url, dict(headers), stream, timeout, allow_redirects,
+            os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+            if url.startswith("https") else
+            os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"),
+        )
         return client.get(
             url,
-            headers=self._headers(**extra_headers),
+            headers=headers,
             stream=stream,
             timeout=timeout,
             allow_redirects=allow_redirects,
@@ -82,9 +95,19 @@ class HTTPConnection:
         client = await self.get_async_client()
         extra_headers = extra_headers or {}
 
+        headers = self._headers(**extra_headers)
+        import os
+        logger.info(
+            "[HTTP-DOWNLOAD-ASYNC] GET %s headers=%s timeout=%s "
+            "allow_redirects=%s proxy=%s",
+            url, dict(headers), timeout, allow_redirects,
+            os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+            if url.startswith("https") else
+            os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"),
+        )
         return client.get(
             url,
-            headers=self._headers(**extra_headers),
+            headers=headers,
             timeout=timeout,
             allow_redirects=allow_redirects,
         )
